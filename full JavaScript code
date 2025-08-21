@@ -1,0 +1,223 @@
+// =============================
+// Simple SPA Router
+// =============================
+const pages = {
+  upload: document.getElementById('page-upload'),
+  workspace: document.getElementById('page-workspace'),
+  dashboard: document.getElementById('page-dashboard'),
+  compare: document.getElementById('page-compare'),
+  settings: document.getElementById('page-settings')
+};
+document.querySelectorAll('.nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const route = btn.getAttribute('data-route');
+    Object.values(pages).forEach(p => p.classList.remove('active'));
+    pages[route].classList.add('active');
+  });
+});
+
+// =============================
+// Theme Toggle
+// =============================
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('click', () => {
+  const cur = document.body.getAttribute('data-theme');
+  setTheme(cur === 'dark' ? 'light' : 'dark');
+});
+function setTheme(mode) {
+  document.body.setAttribute('data-theme', mode);
+}
+
+// =============================
+// Upload Hub – dropzone preview (safe DOM building)
+// =============================
+const drop = document.getElementById('dropzone');
+const preview = document.getElementById('previewList');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault();
+  drop.classList.add('dragover');
+}));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+  e.preventDefault();
+  drop.classList.remove('dragover');
+}));
+drop.addEventListener('click', () => addMockPreview());
+drop.addEventListener('drop', () => addMockPreview());
+let mockId = 1;
+function addMockPreview() {
+  const el = document.createElement('div');
+  el.className = 'preview';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'thumb';
+  thumb.textContent = `PDF ${mockId}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+
+  const spanName = document.createElement('span');
+  spanName.textContent = `doc-${mockId}.pdf`;
+
+  const spanStatus = document.createElement('span');
+  spanStatus.className = 'pill';
+  spanStatus.textContent = 'Ready';
+
+  meta.appendChild(spanName);
+  meta.appendChild(spanStatus);
+
+  el.appendChild(thumb);
+  el.appendChild(meta);
+
+  preview.prepend(el);
+  mockId++;
+}
+
+// =============================
+// Q&A – safe DOM building (no innerHTML)
+// =============================
+const askBtn = document.getElementById('askBtn');
+const qaQ = document.getElementById('qaQuestion');
+const qaA = document.getElementById('qaAnswer');
+askBtn.addEventListener('click', () => {
+  const q = qaQ.value.trim();
+  qaA.style.display = 'block';
+
+  if (!q) {
+    qaA.textContent = 'Please enter a question.';
+    return;
+  }
+
+  // Clear old content
+  qaA.textContent = '';
+
+  const answerText = document.createElement('span');
+  answerText.textContent = "Answer: The framework uses multi-level summarization and a knowledge graph to surface key ideas with verifiable citations.";
+
+  const citation = document.createElement('span');
+  citation.className = 'pill tag-amber';
+  citation.style.marginLeft = '6px';
+  citation.textContent = 'p. 4 ¶ 2';
+
+  qaA.appendChild(answerText);
+  qaA.appendChild(citation);
+});
+
+// =============================
+// Knowledge Graph – simple draggable nodes + edges
+// =============================
+const kg = document.getElementById('kg');
+const nodes = [
+  { id: 'A', label: 'Transformer', x: 40, y: 40 },
+  { id: 'B', label: 'Summarization', x: 200, y: 120 },
+  { id: 'C', label: 'Knowledge Graph', x: 360, y: 60 },
+  { id: 'D', label: 'Q&A (Citations)', x: 140, y: 220 },
+  { id: 'E', label: 'Table Parser', x: 330, y: 220 },
+  { id: 'F', label: 'Visualization', x: 500, y: 160 },
+];
+const edges = [['A', 'B'], ['B', 'C'], ['C', 'D'], ['B', 'E'], ['C', 'F']];
+
+const nodeEls = new Map();
+const nodeById = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+function renderKG() {
+  kg.innerHTML = '';
+  // Edges first
+  edges.forEach(([u, v]) => {
+    const a = nodeById[u], b = nodeById[v];
+    const dx = (b.x - a.x), dy = (b.y - a.y);
+    const len = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    const edge = document.createElement('div');
+    edge.className = 'edge';
+    edge.style.width = len + 'px';
+    edge.style.left = a.x + 'px';
+    edge.style.top = a.y + 12 + 'px';
+    edge.style.transform = `rotate(${ang}deg)`;
+    kg.appendChild(edge);
+  });
+  // Nodes
+  nodes.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'node';
+    el.textContent = n.label;
+    el.style.left = n.x + 'px';
+    el.style.top = n.y + 'px';
+    el.setAttribute('data-id', n.id);
+    kg.appendChild(el);
+    nodeEls.set(n.id, el);
+    enableDrag(el, n);
+  });
+}
+function enableDrag(el, n) {
+  let startX, startY;
+  let dragging = false;
+  el.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX - n.x;
+    startY = e.clientY - n.y;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    n.x = e.clientX - startX;
+    n.y = e.clientY - startY;
+    renderKG();
+  });
+  el.addEventListener('pointerup', (e) => {
+    dragging = false;
+    el.releasePointerCapture(e.pointerId);
+  });
+}
+renderKG();
+
+// =============================
+// Visualization – simple bar chart
+// =============================
+function barChart(canvasId, labels, values) {
+  const c = document.getElementById(canvasId);
+  const ctx = c.getContext('2d');
+  const w = c.width = c.clientWidth;
+  const h = c.height = c.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  const max = Math.max(...values) * 1.2;
+  const pad = 24;
+  const barW = (w - pad * 2) / values.length - 10;
+  values.forEach((v, i) => {
+    const x = pad + i * (barW + 10);
+    const bh = (v / max) * (h - pad * 2);
+    const y = h - pad - bh;
+    // Bars (emerald → amber gradient)
+    const grad = ctx.createLinearGradient(0, y, 0, y + bh);
+    grad.addColorStop(0, getComputedStyle(document.body).getPropertyValue('--accent').trim());
+    grad.addColorStop(1, getComputedStyle(document.body).getPropertyValue('--accent-2').trim());
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, y, barW, bh);
+    // Labels
+    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim();
+    ctx.font = '12px ' + getComputedStyle(document.body).getPropertyValue('--font');
+    ctx.fillText(labels[i], x, h - 6);
+  });
+}
+barChart('vizChart', ['Graph', 'Q&A', 'Tables', 'OCR', 'Summary'], [32, 48, 20, 15, 55]);
+
+// Dashboard reading analytics
+function spark(canvasId) {
+  const vals = Array.from({ length: 14 }, () => Math.floor(Math.random() * 100) + 10);
+  barChart(canvasId, vals.map((_, i) => (i % 2 ? "" : "·")), vals);
+}
+spark('readChart');
+
+// =============================
+// Comparison Lab – fake heatmap
+// =============================
+const hm = document.getElementById('heatmap');
+for (let i = 0; i < 64; i++) {
+  const v = Math.floor(40 + Math.random() * 60);
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+  cell.style.setProperty('--v', v);
+  cell.setAttribute('data-val', v);
+  hm.appendChild(cell);
+}

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" >
+  <meta name="viewport" content="width=device-width, initial-scale=1" >
+  <title>DocuMind • Advanced AI PDF Summarizer</title>
+  <style>
+    /* =====================
+       THEME & TOKENS
+       ===================== */
+    :root {
+      --bg: #0F172A;            /* deep navy */
+      --bg-elev: #111827;       /* elevated bg */
+      --panel: #0b1226;         /* panels */
+      --muted: #64748B;         /* elegant gray */
+      --text: #E5E7EB;          /* light text */
+      --text-dim: #B6C2CF;
+      --accent: #10B981;        /* emerald */
+      --accent-2: #F59E0B;      /* amber */
+      --border: #1f2937;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius-xl: 16px;
+      --radius-2xl: 20px;
+      --gap: 16px;
+      --gap-lg: 24px;
+      --trans-fast: 160ms ease;
+      --trans-slow: 280ms cubic-bezier(.2,.8,.2,1);
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    [data-theme="light"] {
+      --bg: #F8FAFC;
+      --bg-elev: #FFFFFF;
+      --panel: #FFFFFF;
+      --muted: #475569;
+      --text: #0F172A;
+      --text-dim: #334155;
+      --accent: #10B981;
+      --accent-2: #F59E0B;
+      --border: #E2E8F0;
+      --shadow: 0 10px 30px rgba(2,6,23,.08);
+    }
+
+    html, body {
+      height: 100%;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(120deg, var(--bg), #0b132e 60%, var(--bg));
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: .2px;
+    }
+
+    /* =====================
+       LAYOUT
+       ===================== */
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: 72px 1fr;
+      grid-template-areas:
+        "sidebar topbar"
+        "sidebar main";
+      min-height: 100dvh;
+    }
+    .topbar {
+      grid-area: topbar;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: saturate(120%) blur(6px);
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,0));
+    }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:700; }
+    .brand-logo { width: 34px; height: 34px; border-radius: 12px; background: radial-gradient(200px 200px at 10% 10%, var(--accent), transparent), radial-gradient(200px 200px at 85% 85%, var(--accent-2), transparent), linear-gradient(180deg, #0ea5e9 0%, transparent 100%); box-shadow: var(--shadow); }
+    .brand small { color: var(--muted); font-weight: 500; letter-spacing:.4px; }
+
+    .actions { display:flex; align-items:center; gap:10px; }
+    .btn {
+      display:inline-flex; align-items:center; gap:8px; cursor:pointer; border:1px solid var(--border);
+      padding:10px 14px; border-radius: 999px; color: var(--text); background: rgba(255,255,255,.02);
+      transition: transform var(--trans-fast), background var(--trans-fast), border-color var(--trans-fast);
+    }
+    .btn:hover { transform: translateY(-1px); background: rgba(255,255,255,.06); }
+    .btn.primary { border-color: transparent; background: linear-gradient(135deg, var(--accent), #059669); color:#031b14; font-weight:700; }
+
+    .sidebar {
+      grid-area: sidebar; padding: 18px; border-right:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    }
+    .nav {
+      display:flex; flex-direction: column; gap:6px; margin-top: 10px;
+    }
+    .nav button {
+      width:100%; text-align:left; background:transparent; border:1px solid transparent; color:var(--text-dim);
+      padding:12px 12px; border-radius:12px; cursor:pointer; transition: background var(--trans-fast), color var(--trans-fast);
+    }
+    .nav button.active, .nav button:hover { background: rgba(255,255,255,.06); color: var(--text); border-color: var(--border); }
+
+    .main {
+      grid-area: main; padding: 22px; overflow:auto; display:grid; grid-template-rows: auto 1fr;
+      gap: var(--gap-lg);
+    }
+    .page { display:none; animation: fadeIn var(--trans-slow); }
+    .page.active { display:block; }
+    @keyframes fadeIn { from {opacity:0; transform: translateY(4px);} to {opacity:1; transform:none;} }
+
+    .grid {
+      display:grid; gap: var(--gap);
+    }
+    .grid.cols-2 { grid-template-columns: 1.2fr 1fr; }
+    .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+    @media (max-width: 1100px){ .grid.cols-2, .grid.cols-3, .grid.cols-4 { grid-template-columns: 1fr; } }
+
+    .card { background: var(--panel); border:1px solid var(--border); border-radius: var(--radius-2xl); box-shadow: var(--shadow); }
+    .card h3 { margin:0; font-size: 16px; color: var(--text); letter-spacing:.3px; }
+    .card .sub { color: var(--muted); font-size: 12px; }
+    .card .head { display:flex; align-items:center; justify-content: space-between; padding: 14px 16px; border-bottom:1px solid var(--border); }
+    .card .body { padding: 16px; }
+
+    .pill { display:inline-flex; align-items:center; gap:8px; font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); color:var(--text-dim); }
+    .tag-emerald { background: rgba(16,185,129,.12); color:#b7f1dd; border-color: rgba(16,185,129,.25); }
+    .tag-amber { background: rgba(245,158,11,.12); color:#ffe2b5; border-color: rgba(245,158,11,.25); }
+
+    /* =====================
+       UPLOAD HUB
+       ===================== */
+    .dropzone {
+      border:2px dashed rgba(255,255,255,.14); border-radius: var(--radius-2xl);
+      padding: 28px; text-align:center; transition: border-color var(--trans-fast), background var(--trans-fast);
+      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+    }
+    .dropzone.dragover { border-color: var(--accent); background: rgba(16,185,129,.08); }
+    .preview-list { display:grid; grid-template-columns: repeat(5, minmax(180px, 1fr)); gap: var(--gap); margin-top: 16px; }
+    .preview { border:1px solid var(--border); border-radius: 14px; overflow:hidden; background: var(--bg-elev); }
+    .preview .thumb { height:120px; background: repeating-linear-gradient(45deg, rgba(255,255,255,.06), rgba(255,255,255,.06) 10px, transparent 10px, transparent 20px); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:12px; }
+    .preview .meta { padding:10px; font-size:12px; color:var(--text-dim); display:flex; align-items:center; justify-content:space-between; }
+
+    /* =====================
+       DOCUMENT WORKSPACE
+       ===================== */
+    .split { display:grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
+    @media (max-width: 1100px){ .split { grid-template-columns: 1fr; } }
+    .pdf-pane { min-height: 520px; background: radial-gradient(600px 240px at 50% 0%, rgba(16,185,129,.08), transparent), var(--bg-elev); border:1px dashed var(--border); border-radius: var(--radius-2xl); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+    .pdf-pane:before{ content:"PDF Preview"; position:absolute; top:14px; left:16px; font-size:12px; color:var(--muted); }
+
+    .analysis { display:grid; gap: var(--gap); }
+
+    .tabs { display:flex; gap:8px; border-bottom: 1px solid var(--border); }
+    .tab { padding:10px 12px; background:transparent; border:1px solid transparent; color:var(--text-dim); border-top-left-radius:12px; border-top-right-radius:12px; cursor:pointer; }
+    .tab.active { color:var(--text); background: rgba(255,255,255,.06); border-color: var(--border); }
+
+    .tabpanel { display:none; }
+    .tabpanel.active { display:block; }
+
+    .zoom-item { border:1px solid var(--border); border-radius:12px; padding:12px; margin-bottom:10px; background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); }
+    .zoom-item details { cursor:pointer; }
+    .zoom-item summary { list-style:none; }
+    .zoom-item summary::-webkit-details-marker{ display:none; }
+    .zoom-item summary .title { display:flex; align-items:center; justify-content:space-between; gap:12px; font-weight:600; }
+    .zoom-item .more { color: var(--muted); font-size:12px; }
+
+    .qa { display:grid; gap:10px; }
+    .input { border:1px solid var(--border); background: rgba(255,255,255,.03); color:var(--text); padding:12px; border-radius:12px; width:100%; }
+    .answer { border-left:3px solid var(--accent); padding:12px; background: rgba(16,185,129,.06); border-radius: 8px; }
+
+    .entity-list { display:flex; flex-wrap:wrap; gap:8px; }
+    .entity { padding:6px 10px; border:1px solid var(--border); border-radius:999px; font-size:12px; color: var(--text-dim); }
+
+    .kg {
+      position: relative; height: 320px; border:1px solid var(--border); border-radius: 14px; overflow:hidden; background: radial-gradient(600px 240px at 20% 20%, rgba(245,158,11,.08), transparent), var(--bg-elev);
+    }
+    .kg .node { position:absolute; padding:8px 10px; border-radius:999px; background: rgba(255,255,255,.06); border:1px solid var(--border); font-size:12px; cursor:grab; user-select:none; }
+    .kg .edge { position:absolute; background:linear-gradient(90deg, rgba(255,255,255,.16), rgba(255,255,255,.0)); height:2px; transform-origin: left center; }
+
+    .table { width:100%; border-collapse: collapse; }
+    .table th, .table td { border-bottom:1px solid var(--border); padding:10px; text-align:left; font-size:13px; }
+
+    /* =====================
+       DASHBOARD
+       ===================== */
+    .stat { display:flex; align-items:flex-start; gap:14px; }
+    .stat .dot { width:12px; height:12px; border-radius:999px; background: var(--accent); margin-top:6px; box-shadow: 0 0 0 5px rgba(16,185,129,.12); }
+    .kpi { font-size:28px; font-weight:800; letter-spacing:.6px; }
+    canvas.chart { width:100%; height:220px; display:block; }
+
+    /* =====================
+       COMPARISON LAB
+       ===================== */
+    .heatmap { display:grid; grid-template-columns: repeat(8, 1fr); gap:6px; }
+    .cell { height:30px; border-radius:6px; background: rgba(255,255,255,.06); position:relative; }
+    .cell[data-val] { background: linear-gradient(180deg, rgba(16,185,129,calc(var(--v) / 100 * .5)), rgba(245,158,11, calc((100 - var(--v)) / 100 * .35))); }
+    .cell:hover::after { content: attr(data-val) "% similarity"; position:absolute; top:-30px; left:50%; transform:translateX(-50%); background: var(--bg-elev); color: var(--text); padding:4px 8px; border:1px solid var(--border); border-radius:8px; font-size:11px; white-space:nowrap; }
+
+    /* =====================
+       SETTINGS
+       ===================== */
+    .row { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-bottom:1px dashed var(--border); }
+    .row:last-child { border-bottom:0; }
+    .range { width:200px; }
+
+    /* Small helpers */
+    .muted { color: var(--muted); }
+    .flex { display:flex; gap:10px; align-items:center; }
+    .right { margin-left:auto; }
+  </style>
+</head>
+<body data-theme="dark">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true"></div>
+        <div>
+          DocuMind<br>
+          <small>Document Intelligence</small>
+        </div>
+      </div>
+      <div class="nav" role="tablist" aria-label="Primary Navigation">
+        <button class="active" data-route="upload">📥 Upload Hub</button>
+        <button data-route="workspace">📄 Document Workspace</button>
+        <button data-route="dashboard">📊 Dashboard</button>
+        <button data-route="compare">🧪 Comparison Lab</button>
+        <button data-route="settings">⚙️ Settings</button>
+      </div>
+
+      <div style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+        <div class="pill tag-emerald" style="margin-bottom:8px;">Knowledge Graph</div>
+        <div class="pill tag-amber">Personalized Learning</div>
+      </div>
+
+      <div style="margin-top:22px;">
+        <button class="btn" id="themeToggle">🌗 Toggle Theme</button>
+      </div>
+    </aside>
+
+    <header class="topbar">
+      <div class="flex">
+        <span class="pill">Alpha Prototype</span>
+      </div>
+      <div class="actions">
+        <button class="btn">➕ New Project</button>
+        <button class="btn primary">Upload PDF</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <div>
+        <h1 style="margin:0 0 6px 0; font-size:22px;">Advanced AI PDF Summarizer</h1>
+        <div class="muted">Premium, minimalist interface • Emerald insights • Amber highlights</div>
+      </div>
+
+      <!-- =============== PAGES =============== -->
+      <!-- Upload Hub -->
+      <section class="page active" id="page-upload" aria-label="Upload Hub">
+        <div class="grid cols-2">
+          <div class="card">
+            <div class="head"><h3>Drag & Drop</h3><span class="sub">Intelligent preview</span></div>
+            <div class="body">
+              <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload PDFs by drag and drop or click">
+                <div style="font-size:14px;">Drop PDFs here or <span class="pill tag-emerald">Browse</span></div>
+                <div class="muted" style="margin-top:6px; font-size:12px;">OCR, tables, figures & references will be detected automatically.</div>
+              </div>
+              <div class="preview-list" id="previewList"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="head"><h3>Quick Tips</h3><span class="sub">Make the most of DocuMind</span></div>
+            <div class="body">
+              <ul>
+                <li>Zoom summaries like a map: gist → paragraph → section.</li>
+                <li>Ask questions in the Q&A tab to get cited answers.</li>
+                <li>See overlaps & conflicts in the Comparison Lab heatmap.</li>
+                <li>Use Settings to adapt explanations to your expertise.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Document Workspace -->
+      <section class="page" id="page-workspace" aria-label="Document Workspace">
+        <div class="split">
+          <div class="pdf-pane" id="pdfPane">
+            <svg width="92%" height="82%" viewBox="0 0 900 700" style="border-radius:12px; border:1px solid var(--border); background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));">
+              <rect x="40" y="40" width="820" height="620" rx="12" ry="12" fill="rgba(255,255,255,.02)" stroke="var(--border)"/>
+              <rect x="60" y="70" width="340" height="16" rx="8" fill="var(--accent)"/>
+              <rect x="60" y="110" width="780" height="8" rx="4" fill="rgba(255,255,255,.09)"/>
+              <rect x="60" y="134" width="620" height="8" rx="4" fill="rgba(255,255,255,.09)"/>
+              <rect x="60" y="158" width="710" height="8" rx="4" fill="rgba(255,255,255,.09)"/>
+              <rect x="60" y="200" width="360" height="220" rx="10" fill="rgba(245,158,11,.12)"/>
+              <rect x="440" y="200" width="400" height="220" rx="10" fill="rgba(16,185,129,.12)"/>
+              <rect x="60" y="450" width="780" height="8" rx="4" fill="rgba(255,255,255,.09)"/>
+              <rect x="60" y="474" width="680" height="8" rx="4" fill="rgba(255,255,255,.09)"/>
+            </svg>
+          </div>
+
+          <div class="analysis">
+            <div class="tabs" role="tablist">
+              <button class="tab active" data-tab="sum">Summaries</button>
+              <button class="tab" data-tab="qa">Q&A</button>
+              <button class="tab" data-tab="kg">Entities & Graph</button>
+              <button class="tab" data-tab="data">Data</button>
+              <button class="tab" data-tab="viz">Visualize</button>
+            </div>
+
+            <div class="tabpanel active" id="tab-sum">
+              <div class="zoom-item">
+                <details>
+                  <summary><span class="title">1–2 Sentence Gist <span class="more">Click to expand → paragraph</span></span></summary>
+                  <p class="muted">This paper proposes a scalable framework for extracting structured knowledge from PDFs using multi-level summaries, graph reasoning, and interactive Q&A with source-grounded citations.</p>
+                </details>
+              </div>
+              <div class="zoom-item">
+                <details>
+                  <summary><span class="title">1–Paragraph Summary <span class="more">Click to expand → sectional outline</span></span></summary>
+                  <p>We introduce a layered approach that condenses documents into digestible segments, links entities into a knowledge graph, converts tables and figures to structured data, and enables conversational analysis with verifiable citations. The system adapts to user expertise, supports collaboration, and compares multiple documents to surface overlap and conflict.</p>
+                  <div class="zoom-item" style="margin-top:10px;">
+                    <details>
+                      <summary><span class="title">Structured Outline <span class="more">Click to expand → full detail</span></span></summary>
+                      <ul>
+                        <li>Introduction & motivation</li>
+                        <li>Methodology (summaries, Q&A, graph)</li>
+                        <li>Results (data extraction, visualization)</li>
+                        <li>Cross-document analysis</li>
+                        <li>Personalization & collaboration</li>
+                      </ul>
+                    </details>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <div class="tabpanel" id="tab-qa">
+              <div class="qa">
+                <input class="input" id="qaQuestion" placeholder="Ask anything about this PDF… (e.g., What are the main findings?)" >
+                <div class="flex">
+                  <button class="btn" id="askBtn">Ask</button>
+                  <span class="muted">Answers are grounded to page & paragraph anchors.</span>
+                </div>
+                <div id="qaAnswer" class="answer" style="display:none;"></div>
+              </div>
+            </div>
+
+            <div class="tabpanel" id="tab-kg">
+              <div class="entity-list" id="entityList">
+                <span class="entity">Transformer</span>
+                <span class="entity">Knowledge Graph</span>
+                <span class="entity">Summarization</span>
+                <span class="entity">OCR</span>
+                <span class="entity">Citation</span>
+                <span class="entity">Table Parser</span>
+              </div>
+              <div class="kg" id="kg">
+                <!-- edges and nodes injected by JS -->
+              </div>
+            </div>
+
+            <div class="tabpanel" id="tab-data">
+              <div class="card" style="margin-bottom:10px;">
+                <div class="head"><h3>Extracted Table</h3><span class="sub">Export: CSV • JSON • Excel</span></div>
+                <div class="body" style="overflow:auto;">
+                  <table class="table">
+                    <thead>
+                      <tr><th>Metric</th><th>Value</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>Sections</td><td>7</td><td>Auto-detected</td></tr>
+                      <tr><td>Entities</td><td>42</td><td>NER + linking</td></tr>
+                      <tr><td>Tables</td><td>5</td><td>Parsed to CSV</td></tr>
+                      <tr><td>Figures</td><td>3</td><td>Alt-text generated</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="tabpanel" id="tab-viz">
+              <div class="card">
+                <div class="head"><h3>Interactive Visualization</h3><span class="sub">Concept frequency</span></div>
+                <div class="body">
+                  <canvas id="vizChart" class="chart" height="220"></canvas>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <section class="page" id="page-dashboard" aria-label="Dashboard">
+        <div class="grid cols-3">
+          <div class="card"><div class="body stat"><div class="dot"></div><div><div class="kpi" id="kpiDocs">12</div><div class="muted">Processed Documents</div></div></div></div>
+          <div class="card"><div class="body stat"><div class="dot" style="background:var(--accent-2); box-shadow:0 0 0 5px rgba(245,158,11,.12);"></div><div><div class="kpi" id="kpiTime">18h</div><div class="muted">Time Saved</div></div></div></div>
+          <div class="card"><div class="body stat"><div class="dot" style="background:#38bdf8; box-shadow:0 0 0 5px rgba(56,189,248,.12);"></div><div><div class="kpi" id="kpiAccuracy">97%</div><div class="muted">Citation Accuracy</div></div></div></div>
+        </div>
+
+        <div class="grid cols-2" style="margin-top:16px;">
+          <div class="card">
+            <div class="head"><h3>Highlights</h3><span class="sub">Top insights across your library</span></div>
+            <div class="body">
+              <ul>
+                <li>Transformer architectures dominate summarization benchmarks.</li>
+                <li>Graph-based entity linking improves cross-PDF recall by 14%.</li>
+                <li>Interactive Q&A reduces time-to-insight by ~45%.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="card">
+            <div class="head"><h3>Reading Analytics</h3><span class="sub">Last 7 days</span></div>
+            <div class="body"><canvas id="readChart" class="chart" height="220"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Comparison Lab -->
+      <section class="page" id="page-compare" aria-label="Comparison Lab">
+        <div class="card">
+          <div class="head"><h3>Similarity Heatmap</h3><span class="sub">Overlap across documents</span></div>
+          <div class="body">
+            <div class="heatmap" id="heatmap"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="head"><h3>Conflicts & Contradictions</h3><span class="sub">AI-detected statements</span></div>
+          <div class="body">
+            <ul>
+              <li><span class="pill tag-amber">Conflict</span> Paper A claims 92% precision; Paper B reports 84% under identical settings.</li>
+              <li><span class="pill tag-amber">Conflict</span> Dataset splits differ, causing inflated recall in Paper C.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section class="page" id="page-settings" aria-label="Settings">
+        <div class="card">
+          <div class="head"><h3>Personalization</h3><span class="sub">Tailor your experience</span></div>
+          <div class="body">
+            <div class="row">
+              <div>
+                <div><strong>Expertise Level</strong></div>
+                <div class="muted">Beginner → Expert</div>
+              </div>
+              <input type="range" min="1" max="5" value="3" class="range" id="expertise" >
+            </div>
+            <div class="row">
+              <div>
+                <div><strong>Language</strong></div>
+                <div class="muted">Summary & Q&A language</div>
+              </div>
+              <select class="input" style="max-width:260px;">
+                <option>English</option>
+                <option>Hindi</option>
+                <option>Tamil</option>
+                <option>Spanish</option>
+              </select>
+            </div>
+            <div class="row">
+              <div>
+                <div><strong>Collaboration</strong></div>
+                <div class="muted">Enable shared annotations</div>
+              </div>
+              <label class="flex"><input type="checkbox" checked> <span>Project Spaces</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <div class="head"><h3>Theme</h3><span class="sub">Dark / Light</span></div>
+          <div class="body">
+            <div class="flex">
+              <button class="btn" onclick="setTheme('dark')">Dark</button>
+              <button class="btn" onclick="setTheme('light')">Light</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+    // =============================
+    // Simple SPA Router
+    // =============================
+    const pages = {
+      upload: document.getElementById('page-upload'),
+      workspace: document.getElementById('page-workspace'),
+      dashboard: document.getElementById('page-dashboard'),
+      compare: document.getElementById('page-compare'),
+      settings: document.getElementById('page-settings')
+    };
+    document.querySelectorAll('.nav button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const route = btn.getAttribute('data-route');
+        Object.values(pages).forEach(p=>p.classList.remove('active'));
+        pages[route].classList.add('active');
+      });
+    });
+
+    // =============================
+    // Theme Toggle
+    // =============================
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+      const cur = document.body.getAttribute('data-theme');
+      setTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+    function setTheme(mode){ document.body.setAttribute('data-theme', mode); }
+
+    // =============================
+    // Upload Hub – dropzone preview (mock)
+    // =============================
+    const drop = document.getElementById('dropzone');
+    const preview = document.getElementById('previewList');
+    ;['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.add('dragover'); }));
+    ;['dragleave','drop'].forEach(ev=>drop.addEventListener(ev, e=>{ e.preventDefault(); drop.classList.remove('dragover'); }));
+    drop.addEventListener('click', ()=> addMockPreview());
+    drop.addEventListener('drop', ()=> addMockPreview());
+    let mockId = 1;
+    function addMockPreview(){
+      const el = document.createElement('div');
+      el.className = 'preview';
+      el.innerHTML = `
+        <div class="thumb">PDF ${mockId}</div>
+        <div class="meta"><span>doc-${mockId}.pdf</span><span class="pill">Ready</span></div>
+      `;
+      preview.prepend(el); mockId++;
+    }
+
+    // =============================
+    // Q&A – mock answer with citation anchor
+    // =============================
+    const askBtn = document.getElementById('askBtn');
+    const qaQ = document.getElementById('qaQuestion');
+    const qaA = document.getElementById('qaAnswer');
+    askBtn.addEventListener('click', ()=>{
+      const q = qaQ.value.trim();
+      if(!q){ qaA.style.display='block'; qaA.textContent = 'Please enter a question.'; return; }
+      qaA.style.display='block';
+      qaA.innerHTML = `Answer: The framework uses multi-level summarization and a knowledge graph to surface key ideas with verifiable citations. <span class="pill tag-amber" style="margin-left:6px;">p. 4 ¶ 2</span>`;
+    });
+
+    // =============================
+    // Knowledge Graph – simple draggable nodes + edges
+    // =============================
+    const kg = document.getElementById('kg');
+    const nodes = [
+      { id:'A', label:'Transformer', x:40,  y:40 },
+      { id:'B', label:'Summarization', x:200, y:120 },
+      { id:'C', label:'Knowledge Graph', x:360, y:60 },
+      { id:'D', label:'Q&A (Citations)', x:140, y:220 },
+      { id:'E', label:'Table Parser', x:330, y:220 },
+      { id:'F', label:'Visualization', x:500, y:160 },
+    ];
+    const edges = [ ['A','B'], ['B','C'], ['C','D'], ['B','E'], ['C','F'] ];
+
+    const nodeEls = new Map();
+    const nodeById = Object.fromEntries(nodes.map(n=>[n.id,n]));
+
+    function renderKG(){
+      kg.innerHTML = '';
+      // Edges first
+      edges.forEach(([u,v])=>{
+        const a = nodeById[u], b = nodeById[v];
+        const dx = (b.x - a.x), dy = (b.y - a.y);
+        const len = Math.hypot(dx,dy);
+        const ang = Math.atan2(dy,dx) * 180/Math.PI;
+        const edge = document.createElement('div');
+        edge.className = 'edge';
+        edge.style.width = len + 'px';
+        edge.style.left = a.x + 'px';
+        edge.style.top = a.y + 12 + 'px';
+        edge.style.transform = `rotate(${ang}deg)`;
+        kg.appendChild(edge);
+      });
+      // Nodes
+      nodes.forEach(n=>{
+        const el = document.createElement('div');
+        el.className = 'node';
+        el.textContent = n.label;
+        el.style.left = n.x + 'px';
+        el.style.top = n.y + 'px';
+        el.setAttribute('data-id', n.id);
+        kg.appendChild(el); nodeEls.set(n.id, el);
+        enableDrag(el, n);
+      });
+    }
+    function enableDrag(el, n){
+      let startX, startY; let dragging=false;
+      el.addEventListener('pointerdown', (e)=>{ dragging=true; startX=e.clientX - n.x; startY=e.clientY - n.y; el.setPointerCapture(e.pointerId); });
+      el.addEventListener('pointermove', (e)=>{ if(!dragging) return; n.x = e.clientX - startX; n.y = e.clientY - startY; renderKG(); });
+      el.addEventListener('pointerup', (e)=>{ dragging=false; el.releasePointerCapture(e.pointerId); });
+    }
+    renderKG();
+
+    // =============================
+    // Visualization – simple bar chart
+    // =============================
+    function barChart(canvasId, labels, values){
+      const c = document.getElementById(canvasId); const ctx = c.getContext('2d');
+      const w = c.width = c.clientWidth; const h = c.height = c.clientHeight;
+      ctx.clearRect(0,0,w,h);
+      const max = Math.max(...values) * 1.2; const pad = 24; const barW = (w - pad*2) / values.length - 10;
+      values.forEach((v,i)=>{
+        const x = pad + i*(barW+10); const bh = (v/max)*(h - pad*2); const y = h - pad - bh;
+        // Bars (emerald → amber gradient)
+        const grad = ctx.createLinearGradient(0, y, 0, y+bh);
+        grad.addColorStop(0, getComputedStyle(document.body).getPropertyValue('--accent').trim());
+        grad.addColorStop(1, getComputedStyle(document.body).getPropertyValue('--accent-2').trim());
+        ctx.fillStyle = grad; ctx.fillRect(x, y, barW, bh);
+        // Labels
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--text').trim();
+        ctx.font = '12px '+ getComputedStyle(document.body).getPropertyValue('--font');
+        ctx.fillText(labels[i], x, h - 6);
+      });
+    }
+    barChart('vizChart', ['Graph','Q&A','Tables','OCR','Summary'], [32, 48, 20, 15, 55]);
+
+    // Dashboard reading analytics
+    function spark(canvasId){
+      const vals = Array.from({length:14}, ()=> Math.floor(Math.random()*100)+10);
+      barChart(canvasId, vals.map((_,i)=> (i%2?"":"·")), vals);
+    }
+    spark('readChart');
+
+    // =============================
+    // Comparison Lab – fake heatmap
+    // =============================
+    const hm = document.getElementById('heatmap');
+    for(let i=0;i<64;i++){
+      const v = Math.floor(40 + Math.random()*60);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.setProperty('--v', v);
+      cell.setAttribute('data-val', v);
+      hm.appendChild(cell);
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-# Documind-Advanced-AI-PDF-Summarizer-
+# Documind Advanced AI PDF Summarizer
 Advanced AI PDF Summarizer • Upload, preview &amp; analyze PDFs with summaries, Q&amp;A, knowledge graph, and visual insights.
 # DocuMind  
 Advanced AI PDF Summarizer – A web app to upload, preview, and analyze PDFs with intelligent summaries, Q&A, entity graphs, and visual insights.
